@@ -1,0 +1,39 @@
+name: Manual OWASP ZAP API Scan (Lab)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_endpoint:
+        description: "API base URL to scan (example: https://example.com)"
+        required: true
+        type: string
+
+jobs:
+  zap-api-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show endpoint
+        run: echo "Scanning ${{ inputs.api_endpoint }}"
+
+      - name: Basic validation
+        run: |
+          echo "${{ inputs.api_endpoint }}" | grep -E '^https?://' || exit 1
+
+      - name: OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.8.0
+        with:
+          target: "${{ inputs.api_endpoint }}"
+          fail_action: false
+          artifact_name: zap-report
+          cmd_options: >
+            -J zap-report.json
+            -r zap-report.html
+
+      - name: Upload ZAP reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: |
+            zap-report.html
+            zap-report.json
