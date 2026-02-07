@@ -1,82 +1,21 @@
-name: Manual OWASP ZAP Scan (Severity Summary)
+name: OWASP ZAP Scan
 
 on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: "URL to scan (example: https://demo.testfire.net)"
         required: true
         type: string
 
 jobs:
   zap-scan:
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Run OWASP ZAP baseline scan
         uses: zaproxy/action-baseline@v0.10.0
+        continue-on-error: true
         with:
           target: ${{ inputs.target_url }}
           fail_action: false
-          artifact_name: zap-report
-
-  summarize:
-    runs-on: ubuntu-latest
-    needs: zap-scan
-
-    steps:
-      - name: Download ZAP artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: zap-report
-          path: zap-artifacts
-
-      - name: Verify artifact contents
-        run: |
-          echo "📂 Downloaded artifacts:"
-          ls -la zap-artifacts
-
-      - name: Generate severity summary
-        run: |
-          JSON="zap-artifacts/zap-report.json"
-          OUTPUT="zap-severity-summary.txt"
-
-          if [ ! -f "$JSON" ]; then
-            echo "❌ zap-report.json not found in artifact"
-            exit 1
-          fi
-
-          {
-            echo "OWASP ZAP Vulnerability Summary"
-            echo "Target: ${{ inputs.target_url }}"
-            echo "Generated: $(date)"
-            echo "================================="
-            echo
-
-            echo "🔴 HIGH"
-            jq -r '.site[].alerts[]?
-              | select(.riskdesc | startswith("High"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
-
-            echo
-            echo "🟠 MEDIUM"
-            jq -r '.site[].alerts[]?
-              | select(.riskdesc | startswith("Medium"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
-
-            echo
-            echo "🟡 LOW"
-            jq -r '.site[].alerts[]?
-              | select(.riskdesc | startswith("Low"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
-          } > "$OUTPUT"
-
-          echo "✅ Summary generated"
-          cat "$OUTPUT"
-
-      - name: Upload severity summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-severity-summary
-          path: zap-severity-summary.txt
+          artifact_name: zap-raw-report
