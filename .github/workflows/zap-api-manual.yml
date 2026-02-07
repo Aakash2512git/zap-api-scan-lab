@@ -1,4 +1,4 @@
-name: Manual OWASP ZAP Scan (Severity Report Only)
+name: Manual OWASP ZAP Scan (Severity Summary)
 
 on:
   workflow_dispatch:
@@ -28,12 +28,18 @@ jobs:
         with:
           target: ${{ inputs.target_url }}
           cmd_options: >
-           -I
+            -I
 
-      - name: Generate vulnerability report (Low / Medium / High)
+      - name: Generate vulnerability summary file
         run: |
-          REPORT=/zap/wrk/zap_report.json
+          REPORT=/zap/wrk/report_json.json
           OUTPUT=zap-vulnerability-summary.txt
+
+          if [ ! -f "$REPORT" ]; then
+            echo "❌ ZAP report not found at $REPORT"
+            ls -la /zap/wrk
+            exit 1
+          fi
 
           echo "OWASP ZAP Vulnerability Report" > $OUTPUT
           echo "Target: ${{ inputs.target_url }}" >> $OUTPUT
@@ -42,23 +48,20 @@ jobs:
           echo "" >> $OUTPUT
 
           echo "🔴 HIGH SEVERITY" >> $OUTPUT
-          echo "-----------------------------------" >> $OUTPUT
           jq -r '.site[].alerts[] | select(.riskdesc | startswith("High")) |
-            "- Name: \(.alert)\n  URL: \(.instances[0].uri)\n  Description: \(.desc)\n"' $REPORT >> $OUTPUT || true
+            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
 
           echo "" >> $OUTPUT
           echo "🟠 MEDIUM SEVERITY" >> $OUTPUT
-          echo "-----------------------------------" >> $OUTPUT
           jq -r '.site[].alerts[] | select(.riskdesc | startswith("Medium")) |
-            "- Name: \(.alert)\n  URL: \(.instances[0].uri)\n  Description: \(.desc)\n"' $REPORT >> $OUTPUT || true
+            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
 
           echo "" >> $OUTPUT
           echo "🟡 LOW SEVERITY" >> $OUTPUT
-          echo "-----------------------------------" >> $OUTPUT
           jq -r '.site[].alerts[] | select(.riskdesc | startswith("Low")) |
-            "- Name: \(.alert)\n  URL: \(.instances[0].uri)\n  Description: \(.desc)\n"' $REPORT >> $OUTPUT || true
+            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
 
-          echo "✅ Vulnerability report written to $OUTPUT"
+          echo "✅ Summary written to $OUTPUT"
           cat $OUTPUT
 
       - name: Upload reports
@@ -67,5 +70,5 @@ jobs:
           name: zap-reports
           path: |
             zap-vulnerability-summary.txt
-            /zap/wrk/zap_report.html
-            /zap/wrk/zap_report.json
+            /zap/wrk/report_html.html
+            /zap/wrk/report_json.json
