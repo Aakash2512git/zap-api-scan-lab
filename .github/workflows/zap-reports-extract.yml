@@ -1,83 +1,68 @@
-name: ZAP JSON Severity Sorter
+name: Extract ZAP Severity Report
 
 on:
   workflow_dispatch:
 
 jobs:
-  analyze-zap-json:
+  extract-report:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (empty repo ok)
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Upload ZAP JSON
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-input
-          path: zap-report.json
-        if: false
-        # ↑ This step is only for reference
-        # User uploads zap-report.json manually in the UI
-
-      - name: Download uploaded ZAP JSON
+      # 👇 User uploads ZAP JSON artifact manually before running this workflow
+      - name: Download uploaded ZAP JSON artifact
         uses: actions/download-artifact@v4
         with:
-          name: zap-input
-          path: input
+          name: zap-report
+          path: zap-input
 
-      - name: Verify input file
+      - name: Verify JSON exists
         run: |
-          ls -la input
-          test -f input/zap-report.json
+          ls -la zap-input
 
-      - name: Generate severity report
+      - name: Extract severity summary
         run: |
-          JSON="input/zap-report.json"
+          JSON="zap-input/zap-report.json"
           OUTPUT="zap-severity-report.txt"
 
+          if [ ! -f "$JSON" ]; then
+            echo "❌ zap-report.json not found"
+            exit 1
+          fi
+
           {
-            echo "OWASP ZAP Vulnerability Report"
+            echo "OWASP ZAP Severity Report"
             echo "Generated: $(date)"
-            echo "===================================="
+            echo "================================="
             echo
 
             echo "🔴 HIGH SEVERITY"
-            echo "------------------------------------"
             jq -r '
-              .site[].alerts[]
+              .site[].alerts[]?
               | select(.riskdesc | startswith("High"))
-              | "• \(.alert)
-  Description: \(.desc | gsub("<[^>]*>"; ""))
-  URL: \(.instances[0].uri)
-  Recommendation: \(.solution)
-  References: \(.reference)\n"
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n  Recommendation: \(.solution // "Not provided")\n  References: \(.reference // "Not provided")\n"
             ' "$JSON" || echo "None found"
 
             echo
             echo "🟠 MEDIUM SEVERITY"
-            echo "------------------------------------"
             jq -r '
-              .site[].alerts[]
+              .site[].alerts[]?
               | select(.riskdesc | startswith("Medium"))
-              | "• \(.alert)
-  Description: \(.desc | gsub("<[^>]*>"; ""))
-  URL: \(.instances[0].uri)
-  Recommendation: \(.solution)
-  References: \(.reference)\n"
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n  Recommendation: \(.solution // "Not provided")\n  References: \(.reference // "Not provided")\n"
             ' "$JSON" || echo "None found"
 
             echo
             echo "🟡 LOW SEVERITY"
-            echo "------------------------------------"
             jq -r '
-              .site[].alerts[]
+              .site[].alerts[]?
               | select(.riskdesc | startswith("Low"))
-              | "• \(.alert)
-  Description: \(.desc | gsub("<[^>]*>"; ""))
-  URL: \(.instances[0].uri)
-  Recommendation: \(.solution)
-  References: \(.reference)\n"' "$JSON" || echo "None found"         } | tee "$OUTPUT"
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n  Recommendation: \(.solution // "Not provided")\n  References: \(.reference // "Not provided")\n"
+            ' "$JSON" || echo "None found"
+
+          } | tee "$OUTPUT"
+
       - name: Upload final report
         uses: actions/upload-artifact@v4
         with:
