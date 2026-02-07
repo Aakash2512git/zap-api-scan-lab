@@ -1,0 +1,99 @@
+name: Manual OWASP ZAP API Scan (Lab)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_endpoint:
+        description: "API base URL to scan (example: https://demo.testfire.net)"
+        required: true
+        type: string
+
+jobs:
+  zap-api-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show endpoint
+        run: echo "🔍 Scanning ${{ inputs.api_endpoint }}"
+
+      - name: Basic validation
+        run: |
+          echo "${{ inputs.api_endpoint }}" | grep -E '^https?://' || exit 1
+
+      - name: OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.8.0
+        continue-on-error: true
+        with:
+          target: "${{ inputs.api_endpoint }}"
+          fail_action: false
+          cmd_options: >
+            -J zap-report.json
+            -r zap-report.html
+
+      - name: Verify generated files
+        run: |
+          echo "📂 Workspace contents:"
+          ls -la
+
+      - name: Extract severity report (High / Medium / Low)
+        run: |
+          JSON="zap-report.json"
+          OUTPUT="zap-severity-report.txt"
+
+          if [ ! -f "$JSON" ]; then
+            echo "❌ zap-report.json not found"
+            exit 1
+          fi
+
+          {
+            echo "OWASP ZAP Severity Report"
+            echo "Target: ${{ inputs.api_endpoint }}"
+            echo "Generated: $(date)"
+            echo "================================="
+            echo
+
+            echo "🔴 HIGH SEVERITY"
+            jq -r '
+              .site[].alerts[]?
+              | select(.riskdesc | startswith("High"))
+              | "- \(.alert)
+  URL: \(.instances[0].uri)
+  Description: \(.desc)
+  Recommendation: \(.solution // "Not provided")
+  References: \(.reference // "Not provided")\n"
+            ' "$JSON" || echo "None found"
+
+            echo
+            echo "🟠 MEDIUM SEVERITY"
+            jq -r '
+              .site[].alerts[]?
+              | select(.riskdesc | startswith("Medium"))
+              | "- \(.alert)
+  URL: \(.instances[0].uri)
+  Description: \(.desc)
+  Recommendation: \(.solution // "Not provided")
+  References: \(.reference // "Not provided")\n"
+            ' "$JSON" || echo "None found"
+
+            echo
+            echo "🟡 LOW SEVERITY"
+            jq -r '
+              .site[].alerts[]?
+              | select(.riskdesc | startswith("Low"))
+              | "- \(.alert)
+  URL: \(.instances[0].uri)
+  Description: \(.desc)
+  Recommendation: \(.solution // "Not provided")
+  References: \(.reference // "Not provided")\n"
+            ' "$JSON" || echo "None found"
+
+          } | tee "$OUTPUT"
+
+      - name: Upload ZAP reports and severity summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: |
+            zap-report.json
+            zap-report.html
+            zap-severity-report.txt
