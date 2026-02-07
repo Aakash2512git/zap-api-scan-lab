@@ -35,7 +35,7 @@ jobs:
           echo "📂 Workspace contents:"
           ls -la
 
-      - name: Extract severity report (High / Medium / Low)
+      - name: Extract severity report
         run: |
           JSON="zap-report.json"
           OUTPUT="zap-severity-report.txt"
@@ -53,43 +53,35 @@ jobs:
             echo
 
             echo "🔴 HIGH SEVERITY"
-            jq -r '
-              .site[].alerts[]?
-              | select(.riskdesc | startswith("High"))
-              | "- \(.alert)
-  URL: \(.instances[0].uri)
-  Description: \(.desc)
-  Recommendation: \(.solution // "Not provided")
-  References: \(.reference // "Not provided")\n"
+            jq -r '.site[].alerts[]? | select(.riskdesc | startswith("High")) |
+              "- " + .alert +
+              "\n  URL: " + (.instances[0].uri // "N/A") +
+              "\n  Description: " + (.desc // "N/A") +
+              "\n  Recommendation: " + (.solution // "Not provided") +
+              "\n  References: " + (.reference // "Not provided") + "\n"
             ' "$JSON" || echo "None found"
 
-            echo
             echo "🟠 MEDIUM SEVERITY"
-            jq -r '
-              .site[].alerts[]?
-              | select(.riskdesc | startswith("Medium"))
-              | "- \(.alert)
-  URL: \(.instances[0].uri)
-  Description: \(.desc)
-  Recommendation: \(.solution // "Not provided")
-  References: \(.reference // "Not provided")\n"
+            jq -r '.site[].alerts[]? | select(.riskdesc | startswith("Medium")) |
+              "- " + .alert +
+              "\n  URL: " + (.instances[0].uri // "N/A") +
+              "\n  Description: " + (.desc // "N/A") +
+              "\n  Recommendation: " + (.solution // "Not provided") +
+              "\n  References: " + (.reference // "Not provided") + "\n"
             ' "$JSON" || echo "None found"
 
-            echo
             echo "🟡 LOW SEVERITY"
-            jq -r '
-              .site[].alerts[]?
-              | select(.riskdesc | startswith("Low"))
-              | "- \(.alert)
-  URL: \(.instances[0].uri)
-  Description: \(.desc)
-  Recommendation: \(.solution // "Not provided")
-  References: \(.reference // "Not provided")\n"
+            jq -r '.site[].alerts[]? | select(.riskdesc | startswith("Low")) |
+              "- " + .alert +
+              "\n  URL: " + (.instances[0].uri // "N/A") +
+              "\n  Description: " + (.desc // "N/A") +
+              "\n  Recommendation: " + (.solution // "Not provided") +
+              "\n  References: " + (.reference // "Not provided") + "\n"
             ' "$JSON" || echo "None found"
 
           } | tee "$OUTPUT"
 
-      - name: Upload ZAP reports and severity summary
+      - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-reports
