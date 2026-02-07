@@ -27,6 +27,8 @@ jobs:
         continue-on-error: true
         with:
           target: ${{ inputs.target_url }}
+          cmd_options: >
+           -I
 
       - name: Generate vulnerability report (Low / Medium / High)
         run: |
