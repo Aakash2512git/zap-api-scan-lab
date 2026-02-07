@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: "OpenShift route URL (example: https://myapp.apps.cluster.example.com/api/query)"
+        description: "URL to scan (example: https://demo.testfire.net)"
         required: true
         type: string
 
@@ -13,69 +13,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show target
-        run: |
-          echo "🔍 Scanning target:"
-          echo "${{ inputs.target_url }}"
-
-      - name: Validate URL
-        run: |
-          echo "${{ inputs.target_url }}" | grep -E '^https?://' || exit 1
-
       - name: Run OWASP ZAP baseline scan
         uses: zaproxy/action-baseline@v0.10.0
         continue-on-error: true
         with:
           target: ${{ inputs.target_url }}
-          cmd_options: >
-            -I
+          fail_action: false
+          artifact_name: zap-report
 
-      - name: Generate vulnerability summary file
-        shell: bash
+      - name: Generate severity summary file
         run: |
-          REPORT="/zap/wrk/report_json.json"
-          OUTPUT="zap-vulnerability-summary.txt"
+          JSON="zap-report.json"
+          OUTPUT="zap-severity-summary.txt"
 
-          if [ ! -f "$REPORT" ]; then
-            echo "❌ ZAP report not found at $REPORT"
-            echo "📂 Contents of /zap/wrk:"
-            ls -la /zap/wrk
+          if [ ! -f "$JSON" ]; then
+            echo "❌ zap-report.json not found"
+            ls -la
             exit 1
           fi
 
           {
-            echo "OWASP ZAP Vulnerability Report"
+            echo "OWASP ZAP Vulnerability Summary"
             echo "Target: ${{ inputs.target_url }}"
-            echo "Generated on: $(date)"
-            echo "==================================="
+            echo "Generated: $(date)"
+            echo "================================="
             echo
-            echo "🔴 HIGH SEVERITY"
+
+            echo "🔴 HIGH"
             jq -r '.site[].alerts[]?
               | select(.riskdesc | startswith("High"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
 
             echo
-            echo "🟠 MEDIUM SEVERITY"
+            echo "🟠 MEDIUM"
             jq -r '.site[].alerts[]?
               | select(.riskdesc | startswith("Medium"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
 
             echo
-            echo "🟡 LOW SEVERITY"
+            echo "🟡 LOW"
             jq -r '.site[].alerts[]?
               | select(.riskdesc | startswith("Low"))
-              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$JSON"
           } > "$OUTPUT"
 
-          echo "✅ Summary written to $OUTPUT"
-          echo "-----------------------------------"
+          echo "✅ Summary generated:"
           cat "$OUTPUT"
 
-      - name: Upload reports
+      - name: Upload severity summary
         uses: actions/upload-artifact@v4
         with:
-          name: zap-reports
-          path: |
-            zap-vulnerability-summary.txt
-            /zap/wrk/report_html.html
-            /zap/wrk/report_json.json
+          name: zap-severity-summary
+          path: zap-severity-summary.txt
