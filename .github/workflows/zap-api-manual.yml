@@ -1,21 +1,44 @@
-name: OWASP ZAP Scan
+name: Manual OWASP ZAP API Scan (Lab)
 
 on:
   workflow_dispatch:
     inputs:
-      target_url:
+      api_endpoint:
+        description: "API base URL to scan (example: https://demo.testfire.net)"
         required: true
         type: string
 
 jobs:
-  zap-scan:
+  zap-api-scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Run OWASP ZAP baseline scan
-        uses: zaproxy/action-baseline@v0.10.0
+      - name: Show endpoint
+        run: echo "🔍 Scanning ${{ inputs.api_endpoint }}"
+
+      - name: Basic validation
+        run: |
+          echo "${{ inputs.api_endpoint }}" | grep -E '^https?://' || exit 1
+
+      - name: OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.8.0
         continue-on-error: true
         with:
-          target: ${{ inputs.target_url }}
+          target: "${{ inputs.api_endpoint }}"
           fail_action: false
-          artifact_name: zap-raw-report
+          cmd_options: >
+            -J zap-report.json
+            -r zap-report.html
+
+      - name: List generated files (debug)
+        run: |
+          echo "📂 Workspace files:"
+          ls -la
+
+      - name: Upload ZAP reports (whatever exists)
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: |
+            *.json
+            *.html
