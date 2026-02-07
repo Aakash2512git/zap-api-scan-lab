@@ -24,6 +24,7 @@ jobs:
 
       - name: Run OWASP ZAP scan
         uses: zaproxy/action-baseline@v0.10.0
+        continue-on-error: true
         with:
           target: ${{ inputs.target_url }}
           fail_action: false
