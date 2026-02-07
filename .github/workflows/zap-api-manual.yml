@@ -27,30 +27,28 @@ jobs:
         continue-on-error: true
         with:
           target: ${{ inputs.target_url }}
-          fail_action: false
           artifact_name: zap-report
-          cmd_options: >
-            -J zap-report.json
-            -r zap-report.html
 
       - name: Show vulnerability summary (Low / Medium / High)
         run: |
           echo "📊 Vulnerability Summary"
           echo "------------------------"
 
+          REPORT=/zap/wrk/zap_report.json
+
           echo "🔴 High:"
-          jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' zap-report.json
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' $REPORT
 
           echo "🟠 Medium:"
-          jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' zap-report.json
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' $REPORT
 
           echo "🟡 Low:"
-          jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' zap-report.json
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' $REPORT
 
       - name: Upload ZAP reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-reports
           path: |
-            zap-report.html
-            zap-report.json
+            /zap/wrk/zap_report.html
+            /zap/wrk/zap_report.json
