@@ -1,34 +1,50 @@
-name: Manual OWASP ZAP API Scan (Lab)
+name: Manual OWASP ZAP Scan for OpenShift Route
 
 on:
   workflow_dispatch:
     inputs:
-      api_endpoint:
-        description: "API base URL to scan (example: https://example.com)"
+      target_url:
+        description: "OpenShift route URL to scan (example: https://myapp.apps.cluster.example.com/api/query)"
         required: true
         type: string
 
 jobs:
-  zap-api-scan:
+  zap-scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show endpoint
-        run: echo "Scanning ${{ inputs.api_endpoint }}"
-
-      - name: Basic validation
+      - name: Show target
         run: |
-          echo "${{ inputs.api_endpoint }}" | grep -E '^https?://' || exit 1
+          echo "🔍 Scanning target:"
+          echo "${{ inputs.target_url }}"
 
-      - name: OWASP ZAP API Scan
-        uses: zaproxy/action-api-scan@v0.8.0
+      - name: Validate URL
+        run: |
+          echo "${{ inputs.target_url }}" | grep -E '^https?://' || exit 1
+
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-baseline@v0.10.0
         with:
-          target: "${{ inputs.api_endpoint }}"
+          target: ${{ inputs.target_url }}
           fail_action: false
           artifact_name: zap-report
           cmd_options: >
             -J zap-report.json
             -r zap-report.html
+
+      - name: Show vulnerability summary (Low / Medium / High)
+        run: |
+          echo "📊 Vulnerability Summary"
+          echo "------------------------"
+
+          echo "🔴 High:"
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' zap-report.json
+
+          echo "🟠 Medium:"
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' zap-report.json
+
+          echo "🟡 Low:"
+          jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' zap-report.json
 
       - name: Upload ZAP reports
         uses: actions/upload-artifact@v4
