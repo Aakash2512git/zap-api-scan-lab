@@ -1,4 +1,4 @@
-name: Manual OWASP ZAP API Scan (Lab)
+name: Manual OWASP ZAP API Scan 1(Lab)
 
 on:
   workflow_dispatch:
