@@ -31,38 +31,45 @@ jobs:
             -I
 
       - name: Generate vulnerability summary file
+        shell: bash
         run: |
-          REPORT=/zap/wrk/report_json.json
-          OUTPUT=zap-vulnerability-summary.txt
+          REPORT="/zap/wrk/report_json.json"
+          OUTPUT="zap-vulnerability-summary.txt"
 
           if [ ! -f "$REPORT" ]; then
             echo "❌ ZAP report not found at $REPORT"
+            echo "📂 Contents of /zap/wrk:"
             ls -la /zap/wrk
             exit 1
           fi
 
-          echo "OWASP ZAP Vulnerability Report" > $OUTPUT
-          echo "Target: ${{ inputs.target_url }}" >> $OUTPUT
-          echo "Generated on: $(date)" >> $OUTPUT
-          echo "===================================" >> $OUTPUT
-          echo "" >> $OUTPUT
+          {
+            echo "OWASP ZAP Vulnerability Report"
+            echo "Target: ${{ inputs.target_url }}"
+            echo "Generated on: $(date)"
+            echo "==================================="
+            echo
+            echo "🔴 HIGH SEVERITY"
+            jq -r '.site[].alerts[]?
+              | select(.riskdesc | startswith("High"))
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
 
-          echo "🔴 HIGH SEVERITY" >> $OUTPUT
-          jq -r '.site[].alerts[] | select(.riskdesc | startswith("High")) |
-            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
+            echo
+            echo "🟠 MEDIUM SEVERITY"
+            jq -r '.site[].alerts[]?
+              | select(.riskdesc | startswith("Medium"))
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
 
-          echo "" >> $OUTPUT
-          echo "🟠 MEDIUM SEVERITY" >> $OUTPUT
-          jq -r '.site[].alerts[] | select(.riskdesc | startswith("Medium")) |
-            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
-
-          echo "" >> $OUTPUT
-          echo "🟡 LOW SEVERITY" >> $OUTPUT
-          jq -r '.site[].alerts[] | select(.riskdesc | startswith("Low")) |
-            "- \(.alert)\n  URL: \(.instances[0].uri)\n"' $REPORT >> $OUTPUT || true
+            echo
+            echo "🟡 LOW SEVERITY"
+            jq -r '.site[].alerts[]?
+              | select(.riskdesc | startswith("Low"))
+              | "- \(.alert)\n  URL: \(.instances[0].uri)\n"' "$REPORT" || true
+          } > "$OUTPUT"
 
           echo "✅ Summary written to $OUTPUT"
-          cat $OUTPUT
+          echo "-----------------------------------"
+          cat "$OUTPUT"
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
